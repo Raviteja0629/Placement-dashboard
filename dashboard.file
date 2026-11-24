@@ -1,0 +1,351 @@
+<%-- Default.aspx --%>
+<%@ Page Language="C#" AutoEventWireup="true" CodeBehind="Default.aspx.cs" Inherits="Placement_Dashboard.Default" %>
+<!DOCTYPE html>
+<html>
+<head runat="server">
+    <title>Placement Dashboard</title>
+</head>
+<body>
+<form id="form1" runat="server">
+    <h2>Placement Dashboard</h2>
+    <p>
+        <a href="Default.aspx">Dashboard</a> |
+        <a href="Students.aspx">Students</a> |
+        <a href="Placements.aspx">Placements</a> |
+        <a href="Totals.aspx">Placement Totals</a>
+    </p>
+    <hr />
+    <h3>Total Students</h3>
+    <asp:Label ID="lblTotal" runat="server" Text="0" />
+    <h3>Placed Students</h3>
+    <asp:Label ID="lblPlaced" runat="server" Text="0" />
+    <h3>Not Placed</h3>
+    <asp:Label ID="lblNotPlaced" runat="server" Text="0" />
+    <h3>Average Package (LPA)</h3>
+    <asp:Label ID="lblAvgPackage" runat="server" Text="0.00" />
+    <hr />
+</form>
+</body>
+</html>
+
+<%-- Default.aspx.cs --%>
+using System;
+using System.Configuration;
+using System.Data.SqlClient;
+
+namespace Placement_Dashboard
+{
+    public partial class Default : System.Web.UI.Page
+    {
+        protected void Page_Load(object sender, EventArgs e)
+        {
+            if (!IsPostBack)
+            {
+                LoadDashboard();
+            }
+        }
+
+        private void LoadDashboard()
+        {
+            string cs = ConfigurationManager
+                .ConnectionStrings["PlacementDB"].ConnectionString;
+
+            using (SqlConnection con = new SqlConnection(cs))
+            {
+                string query = @"
+                    SELECT
+                    (SELECT COUNT(*) FROM Students) AS TotalStudents,
+                    (SELECT COUNT(*) FROM Students WHERE IsPlaced = 1) AS PlacedStudents,
+                    (SELECT COUNT(*) FROM Students WHERE IsPlaced = 0) AS NotPlaced,
+                    (SELECT AVG(PackageLPA) FROM Placements) AS AveragePackage";
+
+                SqlCommand cmd = new SqlCommand(query, con);
+                con.Open();
+
+                SqlDataReader reader = cmd.ExecuteReader();
+
+                if (reader.Read())
+                {
+                    lblTotal.Text = reader["TotalStudents"].ToString();
+                    lblPlaced.Text = reader["PlacedStudents"].ToString();
+                    lblNotPlaced.Text = reader["NotPlaced"].ToString();
+
+                    decimal avg = reader["AveragePackage"] == DBNull.Value
+                        ? 0
+                        : Convert.ToDecimal(reader["AveragePackage"]);
+
+                    lblAvgPackage.Text = avg.ToString("0.00");
+                }
+
+                reader.Close();
+            }
+        }
+    }
+}
+
+<%-- Placements.aspx --%>
+<%@ Page Language="C#" AutoEventWireup="true" CodeBehind="Placements.aspx.cs" Inherits="Placement_Dashboard.Placements" %>
+<!DOCTYPE html>
+<html>
+<head runat="server">
+    <title>Placement Details</title>
+</head>
+<body>
+<form id="form1" runat="server">
+    <h2>Placement Details</h2>
+
+    <a href="Default.aspx">Dashboard</a> |
+    <a href="Students.aspx">Students</a> |
+    <a href="Placements.aspx">Placements</a> |
+    <a href="Totals.aspx">Placement Totals</a>
+
+    <hr />
+
+    <asp:GridView ID="gvPlacements"
+        runat="server"
+        AutoGenerateColumns="true"
+        GridLines="Both"
+        CellPadding="6">
+    </asp:GridView>
+</form>
+</body>
+</html>
+
+<%-- Placements.aspx.cs --%>
+using System;
+using System.Configuration;
+using System.Data;
+using System.Data.SqlClient;
+
+namespace Placement_Dashboard
+{
+    public partial class Placements : System.Web.UI.Page
+    {
+        string cs = ConfigurationManager
+            .ConnectionStrings["PlacementDB"].ConnectionString;
+
+        protected void Page_Load(object sender, EventArgs e)
+        {
+            if (!IsPostBack)
+            {
+                LoadPlacements();
+            }
+        }
+
+        private void LoadPlacements()
+        {
+            using (SqlConnection con = new SqlConnection(cs))
+            {
+                string query = @"
+                    SELECT
+                        P.PlacementId,
+                        S.StudentName,
+                        S.Branch,
+                        P.CompanyName,
+                        P.PackageLPA
+                    FROM Placements P
+                    INNER JOIN Students S
+                    ON P.StudentId = S.StudentId";
+
+                SqlDataAdapter da = new SqlDataAdapter(query, con);
+
+                DataTable dt = new DataTable();
+                da.Fill(dt);
+
+                gvPlacements.DataSource = dt;
+                gvPlacements.DataBind();
+            }
+        }
+    }
+}
+
+<%-- Students.aspx --%>
+<%@ Page Language="C#" AutoEventWireup="true" CodeBehind="Students.aspx.cs" Inherits="Placement_Dashboard.Students" %>
+<!DOCTYPE html>
+<html>
+<head runat="server">
+    <title>Student Details</title>
+</head>
+<body>
+<form id="form1" runat="server">
+    <h2>Student Details</h2>
+
+    <p>
+        <a href="Default.aspx">Dashboard</a> |
+        <a href="Students.aspx">Students</a> |
+        <a href="Placements.aspx">Placements</a> |
+        <a href="Totals.aspx">Placement Totals</a>
+    </p>
+
+    <hr />
+
+    <asp:GridView ID="gvStudents"
+        runat="server"
+        AutoGenerateColumns="true"
+        GridLines="Both"
+        CellPadding="6">
+    </asp:GridView>
+</form>
+</body>
+</html>
+
+<%-- Students.aspx.cs --%>
+using System;
+using System.Configuration;
+using System.Data;
+using System.Data.SqlClient;
+
+namespace Placement_Dashboard
+{
+    public partial class Students : System.Web.UI.Page
+    {
+        protected void Page_Load(object sender, EventArgs e)
+        {
+            if (!IsPostBack)
+            {
+                LoadStudents();
+            }
+        }
+
+        private void LoadStudents()
+        {
+            string cs = ConfigurationManager
+                .ConnectionStrings["PlacementDB"].ConnectionString;
+
+            using (SqlConnection con = new SqlConnection(cs))
+            {
+                string query = "SELECT * FROM Students";
+
+                SqlDataAdapter da = new SqlDataAdapter(query, con);
+
+                DataTable dt = new DataTable();
+                da.Fill(dt);
+
+                gvStudents.DataSource = dt;
+                gvStudents.DataBind();
+            }
+        }
+    }
+}
+
+<%-- Totals.aspx --%>
+<%@ Page Language="C#" AutoEventWireup="true" CodeBehind="Totals.aspx.cs" Inherits="Placement_Dashboard.Totals" %>
+<!DOCTYPE html>
+<html>
+<head runat="server">
+    <title>Placement Totals</title>
+</head>
+<body>
+<form id="form1" runat="server">
+    <h2>Placement Totals</h2>
+
+    <a href="Default.aspx">Dashboard</a> |
+    <a href="Students.aspx">Students</a> |
+    <a href="Placements.aspx">Placements</a> |
+    <a href="Totals.aspx">Placement Totals</a>
+
+    <hr />
+
+    <h3>Company-wise Placement Statistics</h3>
+
+    <asp:GridView ID="gvTotals"
+        runat="server"
+        AutoGenerateColumns="true"
+        GridLines="Both"
+        CellPadding="6">
+    </asp:GridView>
+
+    <h3>Overall Statistics</h3>
+
+    <p>
+        Total Placements:
+        <asp:Label ID="lblTotalPlacements" runat="server"></asp:Label>
+    </p>
+
+    <p>
+        Total Companies:
+        <asp:Label ID="lblTotalCompanies" runat="server"></asp:Label>
+    </p>
+
+    <p>
+        Overall Average Package:
+        <asp:Label ID="lblAveragePackage" runat="server"></asp:Label>
+        LPA
+    </p>
+</form>
+</body>
+</html>
+
+<%-- Totals.aspx.cs --%>
+using System;
+using System.Configuration;
+using System.Data;
+using System.Data.SqlClient;
+
+namespace Placement_Dashboard
+{
+    public partial class Totals : System.Web.UI.Page
+    {
+        string cs = ConfigurationManager
+            .ConnectionStrings["PlacementDB"].ConnectionString;
+
+        protected void Page_Load(object sender, EventArgs e)
+        {
+            if (!IsPostBack)
+            {
+                LoadTotals();
+            }
+        }
+
+        private void LoadTotals()
+        {
+            using (SqlConnection con = new SqlConnection(cs))
+            {
+                con.Open();
+
+                string query = @"
+                    SELECT
+                        CompanyName,
+                        COUNT(*) AS StudentPlaced,
+                        AVG(PackageLPA) AS AveragePackage
+                    FROM Placements
+                    GROUP BY CompanyName
+                    ORDER BY CompanyName";
+
+                SqlDataAdapter da = new SqlDataAdapter(query, con);
+
+                DataTable dt = new DataTable();
+                da.Fill(dt);
+
+                gvTotals.DataSource = dt;
+                gvTotals.DataBind();
+
+                string overallQuery = @"
+                    SELECT
+                        COUNT(*) AS TotalPlacements,
+                        COUNT(DISTINCT CompanyName) AS TotalCompanies,
+                        AVG(PackageLPA) AS AveragePackage
+                    FROM Placements";
+
+                SqlCommand cmd = new SqlCommand(overallQuery, con);
+
+                SqlDataReader dr = cmd.ExecuteReader();
+
+                if (dr.Read())
+                {
+                    lblTotalPlacements.Text =
+                        dr["TotalPlacements"].ToString();
+
+                    lblTotalCompanies.Text =
+                        dr["TotalCompanies"].ToString();
+
+                    lblAveragePackage.Text =
+                        Convert.ToDecimal(dr["AveragePackage"])
+                        .ToString("0.00");
+                }
+
+                dr.Close();
+            }
+        }
+    }
+}
